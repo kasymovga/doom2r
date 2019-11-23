@@ -396,21 +396,18 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 	my $brush_line_type_ref;
 	my $brush_line_sector_tag;
 	my $other_side_def;
-	my $other_sector;
+	my $other_sector = {};
 	my $middle_tex;
 	#Searching for sector lines
 	foreach my $line(@{ $doom_map->{linedefs} }) {
-		$other_sector = {};
 		if (%{ $line->{right_def}} and $line->{right_def}->{sector} == $sector) {
 			$side_def = $line->{left_def};
-			$other_side_def = $line->{right_def};
 			if (%{ ${side_def} }) {
 				$other_sector = $side_def->{sector};
 			}
 			push @{ $brush_lines }, { v1 => $line->{v1}, v2 => $line->{v2}, side => $side_def, lf => $line->{flags}, other_sector => $other_sector };
 		} elsif (%{ $line->{left_def} } and $line->{left_def}->{sector} == $sector) {
 			$side_def = $line->{right_def};
-			$other_side_def = $line->{left_def};
 			if (%{ ${side_def} }) {
 				$other_sector = $side_def->{sector};
 			}
@@ -427,6 +424,16 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 		#if (%{ $side_def } and not $side_def->{middle} eq '-' and %{ $other_sector }) {
 		#	print $map_file brush_from_line($brush_lines->[(scalar @{ $brush_lines }) - 1], 'middle', $sector->{ceil_z}, $sector->{floor_z}, $sector->{floor_z}, $sector->{ceil_z}, 0);
 		#}
+	}
+	if ($sector->{tag} and not $brush_line_type) {
+		foreach my $line(@{ $doom_map->{linedefs} }) {
+			if ($line->{right_def}->{sector_tag} == $sector->{tag}) {
+				$brush_line_type = $line->{type};
+				$brush_line_type_ref = $line;
+				$brush_line_sector_tag = $line->{sector_tag};
+				print "Special line: $brush_line_type " . $line->{sector_tag} . "\n";
+			}
+		}
 	}
 	my $vertexes = shape_vertexes($brush_lines);
 	my $splitted_brushes;
@@ -471,7 +478,9 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 				or $brush_line_type == 26 or $brush_line_type == 32 or $brush_line_type == 99
 				or $brush_line_type == 133 or $brush_line_type == 27 or $brush_line_type == 33
 				or $brush_line_type == 136 or $brush_line_type == 137 or $brush_line_type == 28
-				or $brush_line_type == 34 or $brush_line_type == 134 or $brush_line_type == 135) {
+				or $brush_line_type == 34 or $brush_line_type == 134 or $brush_line_type == 135
+				or ($brush_line_type == 103 and $brush_line_sector_tag == $sector->{tag})
+				) {
 			#DOOR
 			if ($sector->{ceil_z} < $ceil_top) {
 				print "Create door...\n";
@@ -484,14 +493,17 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 				} elsif ($brush_line_type == 28 or $brush_line_type == 34 or $brush_line_type == 134 or $brush_line_type == 135) {
 					$entities .= "\"spawnflags\" \"64\"\n\"wait\" \"-1\"\n";
 				}
+				if ($sector->{tag}) {
+					$entities .= "\"targetname\" \"sector" . $sector->{tag} . "\"\n";
+				}
 				foreach my $splitted_brush(@{ $splitted_brushes }) {
 					$entities .= brush_text($splitted_brush, "upper", $ceil_top, $ceil_bottom, "caulk", $sector->{ceil_tex}, $sector->{floor_z}, $sector->{ceil_z});
 				}
 				$entities .= "}\n";
 				$sector->{ceil_z} = $ceil_top;
 			}
-		} elsif (($brush_line_type == 88 or $brush_line_type == 62)) {
-			if ($sector->{tag} == $brush_line_type_ref->{sector_tag}) {
+		} elsif (($brush_line_type == 88 or $brush_line_type == 62 or $brush_line_type == 38)) {
+			if ($sector->{tag} == $brush_line_type_ref->{sector_tag} or $brush_line_type == 38) {
 				print "Create lift...\n";
 				my $neighbours = DoomMap::sector_neigbours($doom_map, $sector);
 				foreach my $neighbour(@{ $neighbours }) {
@@ -502,6 +514,12 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 				if ($sector->{floor_z} > $floor_bottom) {
 					print "Lift created\n";
 					$entities .= "{\n\"classname\" \"func_plat\"\n";
+					if ($sector->{tag}) {
+						$entities .= "\"targetname\" \"sector" . $sector->{tag} . "\"\n";
+					}
+					if ($brush_line_type == 38) {
+						$entities .= "\"wait\" \"-1\"\n";
+					}
 					foreach my $splitted_brush(@{ $splitted_brushes }) {
 						$entities .= "// sector $i\n";
 						$entities .= brush_text($splitted_brush, "lower", $sector->{floor_z}, $floor_bottom, $sector->{floor_tex}, "caulk", $sector->{floor_z}, $sector->{ceil_z});
@@ -512,16 +530,16 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 					print "Lift skipped, no enough space $floor_bottom <= " . $sector->{floor_z} . "\n";
 				}
 			}
-		} elsif ($brush_line_type == 23 or $brush_line_type == 11) {
+		} elsif ($brush_line_type == 23 or $brush_line_type == 11 or $brush_line_type == 103 or $brush_line_type == 71) {
 			my $v1 = $brush_line_type_ref->{v1};
 			my $v2 = $brush_line_type_ref->{v2};
 			$entities .= "{\n\"classname\" \"func_button\"\n";
 			$entities .= "\"lip\" \"-2\"\n";
 			$entities .= "\"wait\" \"-1\"\n";
-			if ($brush_line_type == 23) {
-				$entities .= "\"target\" \"sector" . $brush_line_type_ref->{sector_tag} . "\"\n";
-			} else {
+			if ($brush_line_type == 11) {
 				$entities .= "\"target\" \"endlevel\"\n";
+			} else {
+				$entities .= "\"target\" \"sector" . $brush_line_type_ref->{sector_tag} . "\"\n";
 			}
 			$entities .= "\"movedir\" \"" . (-($v2->[1] - $v1->[1])) . " " . ($v2->[0] - $v1->[0]) . " 0\"\n";
 			my $brush_line;
@@ -556,26 +574,32 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 			}
 			$entities .= "}\n";
 		} else {
+			$entities .= "{\n";
+			$entities .= "\"classname\" \"linetype$brush_line_type\"\n";
+			$entities .= "\"origin\" \"" . ($brush_line_type_ref->{v1}->[0] + $brush_line_type_ref->{v2}->[0]) / 2 . " " . ($brush_line_type_ref->{v1}->[1] + $brush_line_type_ref->{v2}->[1]) / 2 . " " . ($sector->{floor_z} + 10) . "\"\n";
+			$entities .= "\"target\" \"sector" . $brush_line_type_ref->{sector_tag} . "\"\n";
+			$entities .= "}\n";
 			print "Unhandled line type $brush_line_type\n";
 		}
-	} elsif ($sector->{tag} > 0) {
-		print "Tagged brush\n";
-		my $neighbours = DoomMap::sector_neigbours($doom_map, $sector);
-		my $floor_bottom = $doom_map->{max_z};
-		foreach my $neighbour(@{ $neighbours }) {
-			if ($floor_bottom > $neighbour->{floor_z}) {
-				$floor_bottom = $neighbour->{floor_z}
-			}
-		}
-		$entities .= "{\n\"classname\" \"func_door\"\n\"angle\" \"-2\"\n\"sounds\" \"1\"\n";
-		$entities .= "\"targetname\" \"sector" . $sector->{tag} . "\"\n";
-		$entities .= "\"wait\" \"-1\"\n";
-		foreach my $splitted_brush(@{ $splitted_brushes }) {
-			$entities .= brush_text($splitted_brush, "lower", $sector->{floor_z}, $floor_bottom - 4, $sector->{floor_tex}, 'caulk', $sector->{floor_z}, $sector->{ceil_z});
-		}
-		$entities .= "}\n";
-		$sector->{floor_z} = $floor_bottom;
 	}
+	#elsif ($sector->{tag} > 0) {
+	#	print "Tagged brush\n";
+	#	my $neighbours = DoomMap::sector_neigbours($doom_map, $sector);
+	#	my $floor_bottom = $doom_map->{max_z};
+	#	foreach my $neighbour(@{ $neighbours }) {
+	#		if ($floor_bottom > $neighbour->{floor_z}) {
+	#			$floor_bottom = $neighbour->{floor_z}
+	#		}
+	#	}
+	#	$entities .= "{\n\"classname\" \"func_door\"\n\"angle\" \"-2\"\n\"sounds\" \"1\"\n";
+	#	$entities .= "\"targetname\" \"sector" . $sector->{tag} . "\"\n";
+	#	$entities .= "\"wait\" \"-1\"\n";
+	#	foreach my $splitted_brush(@{ $splitted_brushes }) {
+	#		$entities .= brush_text($splitted_brush, "lower", $sector->{floor_z}, $floor_bottom - 4, $sector->{floor_tex}, 'caulk', $sector->{floor_z}, $sector->{ceil_z});
+	#	}
+	#	$entities .= "}\n";
+	#	$sector->{floor_z} = $floor_bottom;
+	#}
 	print "Print brushes\n";
 	foreach my $splitted_brush(@{ $splitted_brushes }) {
 		print $map_file "// sector $i\n";
