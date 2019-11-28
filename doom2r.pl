@@ -777,7 +777,7 @@ foreach my $thing(@{ $doom_map->{things} }) {
 		$entities .= "\"model\" \"models/turrets/tesla_head.md3\"\n";
 		$entities .= "\"solid\" \"4\"\n";
 		$entities .= "\"effects\" \"134217728\"\n";
-		$entities .= "\"origin\" \"" . $thing->{x} . " " . $thing->{y} . " " . ($z - 40) . "\"\n";
+		$entities .= "\"origin\" \"" . $thing->{x} . " " . $thing->{y} . " " . ($z - 20) . "\"\n";
 		$entities .= "}\n";
 		$entities .= "{\n";
 		$entities .= "\"classname\" \"light\"\n";
