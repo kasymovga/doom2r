@@ -102,7 +102,6 @@ sub tex_offset_scale {
 	my $projection_side = projection_side($normal_x, $normal_y);
 	if ($projection_side eq 'bottom') {
 		$offset = -($x + $dir_x) + $base_offset;
-		#$offset = $base_offset;
 		$scale = 1;
 	} elsif ($projection_side eq 'right') {
 		$offset = -($y + $dir_y) + $base_offset;
@@ -393,6 +392,18 @@ my $entities = "//Entities\n";
 my $dummy_side_def = { x_offset => 0, y_offset => 0, upper => '-', lower => '-', middle => '-', sector => 65535 };
 my $trigger_side_def = { x_offset => 0, y_offset => 0, upper => 'trigger', lower => 'trigger', middle => 'trigger' };
 my $side_def;
+foreach my $line(@{ $doom_map->{linedefs} }) {
+	if ($line->{type} == 109 or $line->{type} == 38) {
+		my $v1 = $line->{v1};
+		my $v2 = $line->{v2};
+		$entities .= "{\n\"classname\" \"trigger_once\"\n";
+		$entities .= "\"spawnflags\" \"4\"";
+		$entities .= "\"target\" \"sector" . $line->{sector_tag} . "\"\n";
+		my $brush_line = { v1 => $v1,  v2 => $v2, side => {upper => 'trigger', x_offset => 0, y_offset => 0, sector => {}}, lf => 0, other_sector => {} };
+		$entities .= brush_from_line($brush_line, 'upper', $doom_map->{max_z}, $doom_map->{min_z}, 0, 0, 4, 0);
+		$entities .= "}\n";
+	}
+}
 for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 	my $sector = $doom_map->{sectors}->[$i];
 	my $brush_lines = [];
@@ -420,7 +431,7 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 		} else {
 			next;
 		}
-		if ($line->{type}) {
+		if ($line->{type} and $line->{type} != 109 and $line->{type} != 38) {
 			$special_line_type = $line->{type};
 			$special_line = $line;
 			$special_line_sector_tag = $line->{sector_tag};
@@ -625,15 +636,6 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 				$entities .= brush_from_line($brush_line, 'lower', $sector->{floor_z}, $doom_map->{min_z}, $sector->{floor_z}, $sector->{ceil_z}, 1, 1);
 				$brush_line->{side}->{lower} =~ s/^SW1/SW2/;
 			}
-			$entities .= "}\n";
-		} elsif (($special_line_type == 109 or $special_line_type == 38) and not $special_line_remote) {
-			my $v1 = $special_line->{v1};
-			my $v2 = $special_line->{v2};
-			$entities .= "{\n\"classname\" \"trigger_once\"\n";
-			$entities .= "\"spawnflags\" \"4\"";
-			$entities .= "\"target\" \"sector" . $special_line->{sector_tag} . "\"\n";
-			my $brush_line = { v1 => $v1,  v2 => $v2, side => {upper => 'trigger', x_offset => 0, y_offset => 0, sector => {}}, lf => 0, other_sector => {} };
-			$entities .= brush_from_line($brush_line, 'upper', $doom_map->{max_z}, $doom_map->{min_z}, $sector->{floor_z}, $sector->{ceil_z}, 4, 0);
 			$entities .= "}\n";
 		} else {
 			$entities .= "{\n";
