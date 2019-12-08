@@ -571,14 +571,17 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 							}
 						}
 					}
+					$entities .= "{\n\"classname\" \"func_door\"\n";
 					if ($targeted) {
-						$entities .= "{\n\"classname\" \"func_door\"\n";
 						$entities .= "\"wait\" \"-1\"\n";
 						$entities .= "\"angle\" \"-2\"\n";
 						$entities .= "\"sounds\" \"1\"\n";
 						$entities .= "\"targetname\" \"sector" . $sector->{tag} . "\"\n";
 					} else {
-						$entities .= "{\n\"classname\" \"func_plat\"\n";
+						$entities .= "\"spawnflags\" \"1\"\n";
+						$entities .= "\"wait\" \"3\"\n";
+						$entities .= "\"angle\" \"-2\"\n";
+						$entities .= "\"sounds\" \"1\"\n";
 					}
 					$entities .= "\"comment\" \"line_type_$special_line_type\"\n";
 					if ($special_line_sector_tag) {
@@ -586,7 +589,18 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 					}
 					foreach my $splitted_brush(@{ $splitted_brushes }) {
 						$entities .= "// sector $i\n";
+						my $vert_shift = $sector->{floor_z} - $floor_bottom;
+						for my $brush(@$splitted_brush) {
+							if ($brush->{side}->{y_offset}) {
+								$brush->{side}->{y_offset} -= $vert_shift;
+							}
+						}
 						$entities .= brush_text($splitted_brush, "lower", $sector->{floor_z}, $floor_bottom, $sector->{floor_tex}, "caulk", $sector->{floor_z}, $sector->{ceil_z});
+						for my $brush(@$splitted_brush) {
+							if ($brush->{side}->{y_offset}) {
+								$brush->{side}->{y_offset} += $vert_shift;
+							}
+						}
 					}
 					$entities .= "}\n";
 					$sector->{floor_z} = $floor_bottom;
@@ -595,11 +609,14 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 				}
 			}
 		} elsif (not $special_line_remote and ($special_line_type == 23 or $special_line_type == 11 or $special_line_type == 103 or $special_line_type == 71)) {
+			#Buttons
 			my $v1 = $special_line->{v1};
 			my $v2 = $special_line->{v2};
-			$entities .= "{\n\"classname\" \"func_button\"\n";
+			$entities .= "{\n\"classname\" \"func_door\"\n";
 			$entities .= "\"lip\" \"-2\"\n";
 			$entities .= "\"wait\" \"-1\"\n";
+			$entities .= "\"noise1\" \"misc/menu1.wav\"\n";
+			$entities .= "\"sounds\" \"1\"\n";
 			if ($special_line_type == 11) {
 				$entities .= "\"target\" \"endlevel\"\n";
 			} else {
@@ -698,6 +715,59 @@ foreach my $splitted_brush(@{ $splitted_brushes }) {
 	print $map_file "// world triangle\n";
 	print $map_file brush_text($splitted_brush, 'middle', $doom_map->{max_z}, $doom_map->{min_z}, "caulk", "caulk", 0, 0);
 }
+my $box_brush_lines = [
+		{ v1 => $v1, v2 => $v2, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v2, v2 => $v3, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v3, v2 => $v4, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v4, v2 => $v1, side => $dummy_side_def, lf => 0, other_sector => {} },
+		];
+print $map_file brush_text($box_brush_lines, 'middle', $doom_map->{max_z} + 16, $doom_map->{max_z}, "caulk", "caulk", 0, 0);
+print $map_file brush_text($box_brush_lines, 'middle', $doom_map->{min_z}, $doom_map->{min_z} - 16, "caulk", "caulk", 0, 0);
+$v1 = [$doom_map->{min_x} - 16, $doom_map->{min_y}];
+$v2 = [$doom_map->{min_x} - 16, $doom_map->{max_y}];
+$v3 = [$doom_map->{min_x}, $doom_map->{max_y}];
+$v4 = [$doom_map->{min_x}, $doom_map->{min_y}];
+$box_brush_lines = [
+		{ v1 => $v1, v2 => $v2, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v2, v2 => $v3, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v3, v2 => $v4, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v4, v2 => $v1, side => $dummy_side_def, lf => 0, other_sector => {} },
+		];
+print $map_file brush_text($box_brush_lines, 'middle', $doom_map->{max_z}, $doom_map->{min_z}, "caulk", "caulk", 0, 0);
+$v1 = [$doom_map->{max_x}, $doom_map->{min_y}];
+$v2 = [$doom_map->{max_x}, $doom_map->{max_y}];
+$v3 = [$doom_map->{max_x} + 16, $doom_map->{max_y}];
+$v4 = [$doom_map->{max_x} + 16, $doom_map->{min_y}];
+$box_brush_lines = [
+		{ v1 => $v1, v2 => $v2, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v2, v2 => $v3, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v3, v2 => $v4, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v4, v2 => $v1, side => $dummy_side_def, lf => 0, other_sector => {} },
+		];
+print $map_file brush_text($box_brush_lines, 'middle', $doom_map->{max_z}, $doom_map->{min_z}, "caulk", "caulk", 0, 0);
+$v1 = [$doom_map->{min_x}, $doom_map->{min_y} - 16];
+$v2 = [$doom_map->{min_x}, $doom_map->{min_y}];
+$v3 = [$doom_map->{max_x}, $doom_map->{min_y}];
+$v4 = [$doom_map->{max_x}, $doom_map->{min_y} - 16];
+$box_brush_lines = [
+		{ v1 => $v1, v2 => $v2, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v2, v2 => $v3, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v3, v2 => $v4, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v4, v2 => $v1, side => $dummy_side_def, lf => 0, other_sector => {} },
+		];
+print $map_file brush_text($box_brush_lines, 'middle', $doom_map->{max_z}, $doom_map->{min_z}, "caulk", "caulk", 0, 0);
+$v1 = [$doom_map->{min_x}, $doom_map->{max_y}];
+$v2 = [$doom_map->{min_x}, $doom_map->{max_y} + 16];
+$v3 = [$doom_map->{max_x}, $doom_map->{max_y} + 16];
+$v4 = [$doom_map->{max_x}, $doom_map->{max_y}];
+$box_brush_lines = [
+		{ v1 => $v1, v2 => $v2, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v2, v2 => $v3, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v3, v2 => $v4, side => $dummy_side_def, lf => 0, other_sector => {} },
+		{ v1 => $v4, v2 => $v1, side => $dummy_side_def, lf => 0, other_sector => {} },
+		];
+print $map_file brush_text($box_brush_lines, 'middle', $doom_map->{max_z}, $doom_map->{min_z}, "caulk", "caulk", 0, 0);
+
 print $map_file "}\n";
 foreach my $thing(@{ $doom_map->{things} }) {
 	if ($thing->{flags} & 16 or not $thing->{flags} & 4) {
