@@ -20,6 +20,10 @@ sub convert_tex_name {
 		return "common/caulk";
 	} elsif ($tex_name eq 'weapclip') {
 		return "common/weapclip";
+	} elsif ($tex_name eq 'clip') {
+		return "common/clip";
+	} elsif ($tex_name eq 'botclip') {
+		return "common/botclip";
 	} elsif ($tex_name =~ /SKY/) {
 		return "skies/hip_inter";
 	} elsif ($tex_name eq "trigger") {
@@ -346,11 +350,7 @@ sub brush_from_line {
 	}
 	my $v3 = [$v2_o->[0] + $normal_x, $v2_o->[1] + $normal_y];
 	my $v4 = [$v1_o->[0] + $normal_x, $v1_o->[1] + $normal_y];
-	my $extra_tex = 'trigger';
-	if ($solid) {
-		$extra_tex = 'weapclip';
-	}
-	my $side = {x_offset => 0, y_offset => 0, upper => $extra_tex, lower => $extra_tex, middle => $extra_tex, sector => {}};
+	my $side = {x_offset => 0, y_offset => 0, upper => $solid, lower => $solid, middle => $solid, sector => {}};
 	my $brush_lines = [{ v1 => $v1_o, v2 => $v2_o, side => $brush_line->{side}, lf => $brush_line->{lf}, other_sector => $brush_line->{other_sector} },
 			{ v1 => $v2_o, v2 => $v3, side => $side, lf => 0, other_sector => {} },
 			{ v1 => $v3, v2 => $v4, side => $side, lf => 0, other_sector => {} },
@@ -358,11 +358,11 @@ sub brush_from_line {
 			];
 	my $out = "";
 	if ($part eq 'lower') {
-		$out .= brush_text($brush_lines, "lower", $top, $bottom, $extra_tex, $extra_tex, $floor_z, $ceil_z);
+		$out .= brush_text($brush_lines, "lower", $top, $bottom, $solid, $solid, $floor_z, $ceil_z);
 	} elsif ($part eq 'upper') {
-		$out .= brush_text($brush_lines, "upper", $top, $bottom, $extra_tex, $extra_tex, $floor_z, $ceil_z);
+		$out .= brush_text($brush_lines, "upper", $top, $bottom, $solid, $solid, $floor_z, $ceil_z);
 	} elsif ($part eq 'middle') {
-		$out .= brush_text($brush_lines, "middle", $top, $bottom, $extra_tex, $extra_tex, $floor_z, $ceil_z);
+		$out .= brush_text($brush_lines, "middle", $top, $bottom, $solid, $solid, $floor_z, $ceil_z);
 	}
 	return $out;
 }
@@ -393,15 +393,38 @@ my $dummy_side_def = { x_offset => 0, y_offset => 0, upper => '-', lower => '-',
 my $trigger_side_def = { x_offset => 0, y_offset => 0, upper => 'trigger', lower => 'trigger', middle => 'trigger' };
 my $side_def;
 foreach my $line(@{ $doom_map->{linedefs} }) {
+	my $v1 = $line->{v1};
+	my $v2 = $line->{v2};
 	if ($line->{type} == 109 or $line->{type} == 38) {
-		my $v1 = $line->{v1};
-		my $v2 = $line->{v2};
 		$entities .= "{\n\"classname\" \"trigger_once\"\n";
 		$entities .= "\"spawnflags\" \"4\"";
 		$entities .= "\"target\" \"sector" . $line->{sector_tag} . "\"\n";
 		my $brush_line = { v1 => $v1,  v2 => $v2, side => {upper => 'trigger', x_offset => 0, y_offset => 0, sector => {}}, lf => 0, other_sector => {} };
-		$entities .= brush_from_line($brush_line, 'upper', $doom_map->{max_z}, $doom_map->{min_z}, 0, 0, 4, 0);
+		$entities .= brush_from_line($brush_line, 'upper', $doom_map->{max_z}, $doom_map->{min_z}, 0, 0, 4, 'trigger');
 		$entities .= "}\n";
+	}
+	$side_def = $line->{left_def};
+	my $other_sector;
+	$other_sector = {};
+	if (%{ $line->{right_def} }) {
+		$other_sector = $line->{right_def}->{sector};
+	}
+	if (%{ $side_def } and not $side_def->{middle} eq '-' and %{ $other_sector }) {
+		my $brush_line = { v1 => $v2,  v2 => $v1, side => $side_def, lf => $line->{flags}, other_sector => {} };
+		print $map_file brush_from_line($brush_line, 'middle', $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, 4, 'clip');
+		$brush_line = { v1 => $v2,  v2 => $v1, side => {middle => 'botclip', x_offset => 0, y_offset => 0, sector => {}}, lf => $line->{flags}, other_sector => {} };
+		print $map_file brush_from_line($brush_line, 'middle', $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, 4, 'botclip');
+	}
+	$side_def = $line->{right_def};
+	$other_sector = {};
+	if (%{ $line->{left_def} }) {
+		$other_sector = $line->{left_def}->{sector};
+	}
+	if (%{ $side_def } and not $side_def->{middle} eq '-' and %{ $other_sector }) {
+		my $brush_line = { v1 => $v1,  v2 => $v2, side => $side_def, lf => $line->{flags}, other_sector => {} };
+		print $map_file brush_from_line($brush_line, 'middle', $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, 4, 'clip');
+		$brush_line = { v1 => $v1,  v2 => $v2, side => {middle => 'botclip', x_offset => 0, y_offset => 0, sector => {}}, lf => $line->{flags}, other_sector => {} };
+		print $map_file brush_from_line($brush_line, 'middle', $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, $side_def->{sector}->{ceil_z}, $side_def->{sector}->{floor_z}, 4, 'botclip');
 	}
 }
 for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
@@ -437,9 +460,6 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 			$special_line_sector_tag = $line->{sector_tag};
 			print "Special line: $special_line_type " . $line->{sector_tag} . "\n";
 		}
-		#if (%{ $side_def } and not $side_def->{middle} eq '-' and %{ $other_sector }) {
-		#	print $map_file brush_from_line($brush_lines->[(scalar @{ $brush_lines }) - 1], 'middle', $sector->{ceil_z}, $sector->{floor_z}, $sector->{floor_z}, $sector->{ceil_z}, 0, 1);
-		#}
 	}
 	if ($sector->{tag} and not $special_line_type) {
 		foreach my $line(@{ $doom_map->{linedefs} }) {
@@ -552,7 +572,7 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 				$entities .= "}\n";
 				$sector->{ceil_z} = $ceil_top;
 			}
-		} elsif ($special_line_type == 88 or $special_line_type == 62 or $special_line_type == 123 or $special_line_type == 120 or (($special_line_type == 71 or $special_line_type == 38) and $special_line_remote)) {
+		} elsif ($special_line_type == 88 or $special_line_type == 62 or $special_line_type == 123 or $special_line_type == 120 or (($special_line_type == 71 or $special_line_type == 38 or $special_line_type == 23) and $special_line_remote)) {
 			if ($sector->{tag} == $special_line->{sector_tag}) {
 				print "Create lift...\n";
 				foreach my $neighbour(@{ DoomMap::sector_neigbours($doom_map, $sector) }) {
@@ -584,7 +604,7 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 						$entities .= "\"sounds\" \"1\"\n";
 					}
 					$entities .= "\"comment\" \"line_type_$special_line_type\"\n";
-					if ($special_line_sector_tag) {
+					if ($special_line_sector_tag and $special_line_sector_tag != $sector->{tag}) {
 						$entities .= "\"target\" \"sector$special_line_sector_tag\"\n";
 					}
 					foreach my $splitted_brush(@{ $splitted_brushes }) {
@@ -617,6 +637,7 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 			$entities .= "\"wait\" \"-1\"\n";
 			$entities .= "\"noise1\" \"misc/menu1.wav\"\n";
 			$entities .= "\"sounds\" \"1\"\n";
+			$entities .= "\"comment\" \"line_type_$special_line_type\"\n";
 			if ($special_line_type == 11) {
 				$entities .= "\"target\" \"endlevel\"\n";
 			} else {
@@ -640,17 +661,17 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 			}
 			if (not ($brush_line->{side}->{upper} eq '-')) {
 				$brush_line->{side}->{upper} =~ s/^SW2/SW1/;
-				$entities .= brush_from_line($brush_line, 'upper', $doom_map->{max_z}, $sector->{ceil_z}, $sector->{floor_z}, $sector->{ceil_z}, 1, 1);
+				$entities .= brush_from_line($brush_line, 'upper', $doom_map->{max_z}, $sector->{ceil_z}, $sector->{floor_z}, $sector->{ceil_z}, 1, 'weapclip');
 				$brush_line->{side}->{upper} =~ s/^SW1/SW2/;
 			}
 			if (not ($brush_line->{side}->{middle} eq '-')) {
 				$brush_line->{side}->{middle} =~ s/^SW2/SW1/;
-				$entities .= brush_from_line($brush_line, 'middle', $sector->{ceil_z}, $sector->{floor_z}, $sector->{floor_z}, $sector->{ceil_z}, 1, 1);
+				$entities .= brush_from_line($brush_line, 'middle', $sector->{ceil_z}, $sector->{floor_z}, $sector->{floor_z}, $sector->{ceil_z}, 1, 'weapclip');
 				$brush_line->{side}->{middle} =~ s/^SW1/SW2/;
 			}
 			if (not ($brush_line->{side}->{lower} eq '-')) {
 				$brush_line->{side}->{lower} =~ s/^SW2/SW1/;
-				$entities .= brush_from_line($brush_line, 'lower', $sector->{floor_z}, $doom_map->{min_z}, $sector->{floor_z}, $sector->{ceil_z}, 1, 1);
+				$entities .= brush_from_line($brush_line, 'lower', $sector->{floor_z}, $doom_map->{min_z}, $sector->{floor_z}, $sector->{ceil_z}, 1, 'weapclip');
 				$brush_line->{side}->{lower} =~ s/^SW1/SW2/;
 			}
 			$entities .= "}\n";
@@ -684,6 +705,15 @@ for (my $i = 0, my $n = @{ $doom_map->{sectors} }; $i <$n; $i++) {
 	foreach my $splitted_brush(@{ $splitted_brushes }) {
 		print $map_file "// sector $i\n";
 		print $map_file sector_brushes_text($splitted_brush, $sector, $doom_map->{min_z}, $doom_map->{max_z});
+	}
+	if (lc $sector->{floor_tex} eq 'nukage1') {
+		$entities .= "{\n";
+		$entities .= "\"classname\" \"trigger_hurt\"\n";
+		$entities .= "\"dmg\" \"5\"\n";
+		foreach my $splitted_brush(@{ $splitted_brushes }) {
+			$entities .= brush_text($splitted_brush, "middle", $sector->{floor_z} + 4, $sector->{floor_z}, 'trigger', 'trigger', $sector->{floor_z}, $sector->{ceil_z});
+		}
+		$entities .= "}\n";
 	}
 	$sector->{floor_z} = $floor_z_save;
 	$sector->{ceil_z} = $ceil_z_save;
@@ -778,8 +808,10 @@ foreach my $thing(@{ $doom_map->{things} }) {
 	$entities .= "{\n";
 	if ($thing->{type} == 1) {
 		$entities .= "\"classname\" \"info_player_start\"\n";
+		$z += 10;
 	} elsif ($thing->{type} > 1 and $thing->{type} < 5) {
 		$entities .= "\"classname\" \"info_player_coop\"\n";
+		$z += 10;
 	} elsif ($thing->{type} == 2014) {
 		$entities .= "\"classname\" \"item_health_small\"\n";
 	} elsif ($thing->{type} == 2011) {
